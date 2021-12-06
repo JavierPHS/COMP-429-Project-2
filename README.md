@@ -12,7 +12,8 @@ This program uses Java to implement the Distance Vector Routing Protocol in a 4-
   
 ##USAGE
 
-As soon as the program begins, use this command to begin the server for each program before using any of the other commands:
+As soon as the program begins, use this command to begin the server for each program before using any of the
+other commands:
   "server -t top.txt -i [interval value here]"    <---- use on server 1
   "server -t top2.txt -i [interval value here]"    <---- use on server 2
   "server -t top3.txt -i [interval value here]"    <---- use on server 3
