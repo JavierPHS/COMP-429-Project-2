@@ -10,7 +10,7 @@ This program uses Java to implement the Distance Vector Routing Protocol in a 4-
 3) In the CMD terminal, navigate to the 'test' folder.
 4) While in the same directory as the "test.jar" file, use the command "java -jar test.jar" to begin the program
   
-#USAGE
+##USAGE
 
 As soon as the program begins, use this command to begin the server for each program before using any of the other commands:
   "server -t top.txt -i [interval value here]"    <---- use on server 1
