@@ -901,15 +901,14 @@ public void bootup() throws IOException {
 		//System.out.println("did Routing Table change = "+didRoutingTableChange);
 		//System.out.println("New Routing Table = "+myNewRoutingTable);
 		
-		// UNCOMMENT BELOW IF YOU WANT EVERY CHANGE IN ROUTING TABLE TO BE IMMEDIATELY UPDATED ON EVERY OTHER SERVER
-		/*
+		
 		if (didRoutingTableChange) {
 			serverList.get(i).routingTable = myNewRoutingTable;
 			// send routing table to neighbors
-			doStep(serverList);
+			doStep(serverList);   // UNCOMMENT BELOW IF YOU WANT EVERY CHANGE IN ROUTING TABLE TO BE IMMEDIATELY UPDATED ON EVERY OTHER SERVER
 
 		}
-		*/
+		
 		
 		//serverList.get(i).noOfPacketsReceived++;
 		// displayRoutingTable(serverList);
