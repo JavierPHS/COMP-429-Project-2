@@ -6,7 +6,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
-//import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -17,19 +16,9 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.Date;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
-
-
-class Message{
-	String operation;
-	HashMap<Integer, Integer> link=new HashMap<>();
-	int[][] rt;
-}
-
-
 
 public class DVRP {
 
@@ -43,6 +32,7 @@ public class DVRP {
 	ServerSocket serverSocket;
 	int numDisabledServers = 0;
 	int numPackets = 0;
+	boolean serverFlag = false;
 	
 
 	public static void main(String[] args) {
@@ -66,6 +56,17 @@ public class DVRP {
 			}
 
 			switch (splitLine[0]) {
+			
+			case "help":
+				System.out.println(line + " SUCCESS");
+				System.out.println("\nList of Commands supported:" + "\n>> help\tDisplays a list of usable commands"
+						+ "\n>> update <server id 1> <server id 2> <link cost>\t This command will update the link cost between any 2 servers existing connection" 
+						+ "\n>> step\tThis will immediately send out the host server's routing data to all of its neighbors"
+						+ "\n>> packets\tThis will display the amount of packets this server has received since its last invocation"
+						+ "\n>> display\tThis will print out the current routing table for this server"
+						+ "\n>> disable <server id>\tThis will disable and shut down the selected server. The other servers routing table's will be updated"
+						+ "\n>> crash\tThis will crash the host server and notify the other client servers that the connection no longer exists\n");
+				break;
 			case "server":
 
 				try {
@@ -97,14 +98,21 @@ public class DVRP {
 				}
 
 				System.out.println(splitLine[0] + " SUCCESS\n");
+				serverFlag = true;
 				break;
-			case "help":
-				System.out.println(line + " SUCCESS");
-				System.out.println("\nList of Commands supported:" + "\n>> help"
-						+ "\n>> update <server id 1> <server id 2> <link cost>" + "\n>> step" + "\n>> packets"
-						+ "\n>> display" + "\n>> disable <server id>" + "\n>> crash\n");
+			case "step":
+				if (!serverFlag) {
+					System.out.println("The server has yet to be started.\n");
+					break;
+				}
+				stepCMD(serverList);
+				System.out.println("STEP SUCCESS\n");
 				break;
 			case "update":
+				if (!serverFlag) {
+					System.out.println("The server has yet to be started.\n");
+					break;
+				}
 				int linkServer1 = Integer.parseInt(splitLine[1]);
 				int linkServer2 = Integer.parseInt(splitLine[2]);
 				String newCostOfLink =  splitLine[3];
@@ -123,20 +131,29 @@ public class DVRP {
 					sendUpdateLinkCostToNeighbor(linkServer1,linkServer2,newCostOfLink);
 					break;
 				}
-			case "step":
-				doStep(serverList);
-				System.out.println("STEP SUCCESS\n");
-				break;
+			
 			case "packets":
+				if (!serverFlag) {
+					System.out.println("The server has yet to be started.\n");
+					break;
+				}
 				displayPackets(serverList);
 				System.out.println("PACKETS SUCCESS\n");
 				break;
 			case "display":
+				if (!serverFlag) {
+					System.out.println("The server has yet to be started.\n");
+					break;
+				}
 				System.out.println();
 				displayRoutingTable(serverList);
 				System.out.println("\nDISPLAY SUCCESS\n");
 				break;
 			case "disable":
+				if (!serverFlag) {
+					System.out.println("The server has yet to be started.\n");
+					break;
+				}
 				//send this to all servers, not just neighbors
 				if(Integer.parseInt(splitLine[1])==(myServerId))
 				{
@@ -153,6 +170,7 @@ public class DVRP {
 				System.exit(1);
 				break;
 			default:
+				System.out.println("Invalid Command. Please type 'help' for a list of commands.");
 				break;
 			}
 
@@ -160,7 +178,7 @@ public class DVRP {
 	}
 
 
-	private void sendUpdateLinkCostToNeighbor(int linkServer1, int linkServer2, String newCostOfLink) {
+	private void sendUpdateLinkCostToNeighbor(int linkServer1, int linkServer2, String newCostOfLink) throws IndexOutOfBoundsException {
 
 		if(newCostOfLink.equalsIgnoreCase("inf")) {
 			routingTableReadFromTopologyFile[linkServer1-1][linkServer2-1] = 9999;
@@ -168,9 +186,20 @@ public class DVRP {
 		else {
 			routingTableReadFromTopologyFile[linkServer1-1][linkServer2-1] = Integer.parseInt(newCostOfLink);
 		}
+		
+		for(int x = 0; x < serverList.size()+numDisabledServers; x++) {
+			if(serverList.get(x).id == myServerId) {
+				if(newCostOfLink.equalsIgnoreCase("inf")) {
+					serverList.get(x).routingTable[linkServer1-1][linkServer2-1] = 9999;
+				}
+				else {
+					serverList.get(x).routingTable[linkServer1-1][linkServer2-1] = Integer.parseInt(newCostOfLink);
+				}
+			}
+		}
 
-
-		for(int x=0;x<serverList.size();x++) {
+		/*
+		for(int x = 0; x < serverList.size()+numDisabledServers; x++) {
 			if(serverList.get(x).id == myServerId) {
 
 				for(int i=0;i<routingTableReadFromTopologyFile.length;i++) {
@@ -181,6 +210,7 @@ public class DVRP {
 				break;
 			}
 		}
+		*/
 
 		JSONObject obj=new JSONObject();
 		try {
@@ -197,6 +227,10 @@ public class DVRP {
 		}
 		try {
 			for(int i=0;i<serverList.size();i++) {
+				if(serverList.get(i).id == myServerId) {
+					
+				}
+				else {
 				InetAddress ip=InetAddress.getByName(serverList.get(i).ipAddress);
 				Socket socket = new Socket(ip, serverList.get(i).port);
 				//System.out.println("socket Created");
@@ -206,13 +240,20 @@ public class DVRP {
 				// transfer JSONObject as String to the server
 				dataOutputStream.writeUTF(obj.toString());
 				//socket.close();
+				}
 
 			}
 		} catch (Exception e) {
 			System.out.println("Connection(s) failed");
 		}
-		updateRoutingTable(serverList, routingTableReadFromTopologyFile);
-		doStep(serverList);
+		
+		for(int x = 0; x < serverList.size()+numDisabledServers; x++) {
+			if(serverList.get(x).id == myServerId) {
+				updateRoutingTable(serverList, serverList.get(x).routingTable);
+			}
+		}
+		
+		//stepCMD(serverList);
 	}
 
 
@@ -249,7 +290,8 @@ public class DVRP {
 
 
 	private void sendDisableToserverList(int dsid) {
-
+		
+		/*
 		for(int i = 0; i < routingTableReadFromTopologyFile.length; i++) {
 			for(int j = 0; j < routingTableReadFromTopologyFile[i].length; j++) {
 				if(j == (dsid - 1)) {
@@ -266,6 +308,30 @@ public class DVRP {
 					for(int j=0;j<routingTableReadFromTopologyFile[i].length;j++) {
 						serverList.get(x).routingTable[i][j] = routingTableReadFromTopologyFile[i][j];
 						//System.out.println("routingTableReadFromTopologyFile["+i+"]["+j+"] = "+routingTableReadFromTopologyFile[i][j]); 
+					}
+				}
+				break;
+			}
+		}
+		*/
+		
+		for(int x = 0; x < serverList.size()+numDisabledServers; x++) {
+			if(serverList.get(x).id == myServerId) {
+				serverList.get(x).neighborsIdAndCost.remove(dsid);
+				/*
+				for(int i=0;i<routingTableReadFromTopologyFile.length;i++) {
+					for(int j=0;j<routingTableReadFromTopologyFile[i].length;j++) {
+						serverList.get(x).routingTable[i][j] = routingTableReadFromTopologyFile[i][j];
+					}
+				}
+				*/
+				for(int i = 0; i < serverList.get(x).routingTable.length; i++) {
+					for(int j = 0; j < serverList.get(x).routingTable[i].length; j++) {
+						if(j == (dsid-1)) {
+							continue;
+						}
+						serverList.get(x).routingTable[j][dsid-1] = 9999;
+						serverList.get(x).routingTable[dsid-1][j] = 9999;
 					}
 				}
 				break;
@@ -302,7 +368,7 @@ public class DVRP {
 		}
 		serverList.remove(dsid-1);
 		nextHop.remove(dsid);
-		doStep(serverList);	
+		stepCMD(serverList);	
 	}
 
 
@@ -366,7 +432,7 @@ public class DVRP {
 		}
 		*/
 		
-		System.out.println("\nRouting Table is: ");
+		System.out.println("Routing Table is: ");
 		//This will print out the routing table
 		System.out.println("<Dest_ID> <Next_Hop> <Cost>");
 		for (int i = 0; i < serverList.size(); i++) {
@@ -460,7 +526,7 @@ public class DVRP {
 						newServer.setId(Integer.parseInt(splitLine[0]));
 						newServer.setIpAddress(splitLine[1]);
 						newServer.setPort(Integer.parseInt(splitLine[2]));
-						newServer.setNoOfPacketsReceived(0);
+						//newServer.setNoOfPacketsReceived(0);
 						serverList.add(newServer);
 					}
 				} else {
@@ -566,7 +632,8 @@ public void bootup() throws IOException {
 					else {
 						routingTableReadFromTopologyFile[server2-1][server1-1] = Integer.parseInt(newCost);
 					}
-					for(int x=0;x<serverList.size();x++) {
+					try {
+					for(int x = 0; x < serverList.size()+numDisabledServers; x++) {
 						if(serverList.get(x).id == myServerId) {
 
 							for(int i=0;i<routingTableReadFromTopologyFile.length;i++) {
@@ -577,8 +644,16 @@ public void bootup() throws IOException {
 							break;
 						}
 					}
-					updateRoutingTable(serverList, routingTableReadFromTopologyFile);
+					
+					for(int x = 0; x < serverList.size()+numDisabledServers; x++) {
+						if(serverList.get(x).id == myServerId) {
+							updateRoutingTable(serverList, serverList.get(x).routingTable);
+						}
+					}
 					numPackets++;
+					} catch (IndexOutOfBoundsException e) {
+						
+					}
 					break;
 					
 				case "disable":
@@ -588,6 +663,16 @@ public void bootup() throws IOException {
 						System.out.println("SERVER HAS BEEN DISABLED. SHUTTING DOWN...");
 						System.exit(0);
 					}
+					try {
+					numDisabledServers++;
+					numPackets++;
+					nextHop.remove(disable_server_id);
+					serverList.remove(disable_server_id-1);
+					} catch (IndexOutOfBoundsException e) {
+						
+					}
+					
+					/*
 					for(int i = 0; i < routingTableReadFromTopologyFile.length; i++) {
 						for(int j = 0; j < routingTableReadFromTopologyFile[i].length; j++) {
 							if(j == (disable_server_id-1)) {
@@ -597,27 +682,43 @@ public void bootup() throws IOException {
 							routingTableReadFromTopologyFile[disable_server_id-1][j] = 9999;
 						}
 					}
-					for(int x=0;x<serverList.size();x++) {
+					*/
+					for(int x = 0; x < serverList.size()+numDisabledServers; x++) {
 						if(serverList.get(x).id == myServerId) {
 							serverList.get(x).neighborsIdAndCost.remove(disable_server_id);
-
+							/*
 							for(int i=0;i<routingTableReadFromTopologyFile.length;i++) {
 								for(int j=0;j<routingTableReadFromTopologyFile[i].length;j++) {
 									serverList.get(x).routingTable[i][j] = routingTableReadFromTopologyFile[i][j];
 								}
 							}
+							*/
+							for(int i = 0; i < serverList.get(x).routingTable.length; i++) {
+								for(int j = 0; j < serverList.get(x).routingTable[i].length; j++) {
+									if(j == (disable_server_id-1)) {
+										continue;
+									}
+									serverList.get(x).routingTable[j][disable_server_id-1] = 9999;
+									serverList.get(x).routingTable[disable_server_id-1][j] = 9999;
+								}
+							}
 							break;
 						}
 					}
-
-					serverList.remove(disable_server_id-1);
-					nextHop.remove(disable_server_id);
-					numDisabledServers++;
-					numPackets++;
 					break;
+					
 				case "crash":
 					int crashId = Integer.parseInt(receivedMSG.get("server_id").toString());
 					System.out.println("Server " + crashId + " has crashed. Updating table...");
+					try {
+					numDisabledServers++;
+					numPackets++;
+					nextHop.remove(crashId);
+					serverList.remove(crashId-1);
+					} catch (IndexOutOfBoundsException e) {
+						
+					}
+					
 					for(int i=0;i<routingTableReadFromTopologyFile.length;i++) {
 						for(int j=0;j<routingTableReadFromTopologyFile[i].length;j++) {
 							if(j == (crashId-1)) {
@@ -627,7 +728,7 @@ public void bootup() throws IOException {
 							routingTableReadFromTopologyFile[crashId-1][j] = 9999;
 						}
 					}
-					for(int x=0;x<serverList.size();x++) {
+					for(int x = 0; x < serverList.size()+numDisabledServers; x++) {
 						if(serverList.get(x).id == myServerId) {
 							serverList.get(x).neighborsIdAndCost.remove(crashId);
 
@@ -639,16 +740,11 @@ public void bootup() throws IOException {
 							break;
 						}
 					}
-					
-					serverList.remove(crashId-1);
-					nextHop.remove(crashId);
-					numDisabledServers++;
-					numPackets++;
 					break;
 				} // end switch
 			}
 		} catch (IOException e) {
-			System.out.println("Connection has been dropped");
+			//System.out.println("Connection has been dropped");
 		}
 	}
 }
@@ -674,9 +770,9 @@ public void bootup() throws IOException {
 	
 	
 	
-	private void doStep(ArrayList<ServerDetails> serverList) {
+	private void stepCMD(ArrayList<ServerDetails> serverList) throws IndexOutOfBoundsException {
 
-		for (int i = 0; i < serverList.size(); i++) {
+		for (int i = 0; i < serverList.size()+numDisabledServers; i++) {
 			if (serverList.get(i).id == myServerId) {
 				Iterator<Map.Entry<Integer, Integer>> itr = serverList.get(i).neighborsIdAndCost.entrySet().iterator();
 				while (itr.hasNext()) {
@@ -685,7 +781,7 @@ public void bootup() throws IOException {
 					Map.Entry<Integer, Integer> entry = itr.next();
 
 					// find ip of neighbor and send routing table to that neighbor
-					for (int k = 0; k < serverList.size(); k++) {
+					for (int k = 0; k < serverList.size()+numDisabledServers; k++) {
 						if (serverList.get(k).id == entry.getKey()) {
 							ipAddressOfNeighbor = serverList.get(k).ipAddress;
 							portOfNeighbor = serverList.get(k).port;
@@ -703,13 +799,13 @@ public void bootup() throws IOException {
 		}
 	}
 
-	private ArrayList<ServerDetails> updateRoutingTable(ArrayList<ServerDetails> serverList, int[][] nrt) {
+	private ArrayList<ServerDetails> updateRoutingTable(ArrayList<ServerDetails> serverList, int[][] nrt) throws IndexOutOfBoundsException {
 
 		int[][] myOriginalRoutingTable = new int[serverList.size()+numDisabledServers][serverList.size()+numDisabledServers];
 		int[][] myNewRoutingTable = new int[serverList.size()+numDisabledServers][serverList.size()+numDisabledServers];
 
 		int i = 0;
-		for (i = 0; i < serverList.size(); i++) {
+		for (i = 0; i < serverList.size()+numDisabledServers; i++) {
 			if (serverList.get(i).getId() == myServerId) {
 
 				for(int j = 0; j < serverList.get(i).routingTable.length; j++) {
@@ -794,7 +890,7 @@ public void bootup() throws IOException {
 		if (didRoutingTableChange) {
 			serverList.get(i).routingTable = myNewRoutingTable;
 			// send routing table to neighbors
-			//doStep(serverList);   // UNCOMMENT IF YOU WANT EVERY CHANGE IN ROUTING TABLE TO BE IMMEDIATELY UPDATED ON EVERY OTHER SERVER
+			//stepCMD(serverList);   // UNCOMMENT IF YOU WANT EVERY CHANGE IN ROUTING TABLE TO BE IMMEDIATELY UPDATED ON EVERY OTHER SERVER
 
 		}
 		return serverList;
@@ -807,7 +903,7 @@ public void bootup() throws IOException {
 			//now = new Date(); // initialize date
 			//System.out.println("Time is :" + now); // Display current time
 			System.out.println("AUTOMATICALLY SENDING ROUTING TABLE...\n");
-			doStep(serverList);
+			stepCMD(serverList);
 		}
 	}
 }
