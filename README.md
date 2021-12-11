@@ -19,5 +19,5 @@ As soon as the program begins, use this command to begin the server for each pro
 "server -t top4.txt -i [interval value here]"    <---- use on server 4
   
 The interval value is the amount of time, in seconds, you want the server to wait before sending out automatic routing table updates.
-Once this is done, you can use help for assistance on the rest of the program.
+Once this is done, you can use 'help' for assistance on the rest of the program.
   
